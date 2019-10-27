@@ -9,6 +9,19 @@ from PIL import ImageFilter, Image
 from dataset import TwoStepData
 from torch.utils.data import DataLoader
 from train import ModelTrain
+import torch.nn.functional as F
+import numpy as np
+
+
+def imshow(inp, title=None):
+    """Imshow ."""
+    inp = inp.detach().cpu().numpy().transpose((1, 2, 0))
+    inp = np.clip(inp, 0, 1)
+    plt.imshow(inp)
+    if title is not None:
+        plt.title(title)
+    plt.pause(0.001)  # pause a bit so that plots a
+
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 state_file_root = "/data3/vimg18/python_projects/icnn-face/checkpoints_8bd0cf02/"
@@ -25,27 +38,24 @@ test_dataset = TwoStepData(txt_file=txt_file,
                                New_ToTensor()
                            ])
                            )
-test_dataloader = DataLoader(test_dataset, batch_size=5,
+test_dataloader = DataLoader(test_dataset, batch_size=16,
                              shuffle=False, num_workers=4)
 
 test = ModelTrain()
 test.load_state(state_file_1)
 
 test_img = next(iter(test_dataloader))
-img = test_img['image']
-index = test_img['index']
-labels = test_img['labels']
-img = [TF.to_tensor(TF.resize(TF.to_pil_image(img[r]), (64, 64), Image.ANTIALIAS))
-       for r in range(len(img))]
-img = torch.stack(img).to(device)
-orig = test_img['image'].to(device)
-
+img = test_img['image'].to(device)
+orig = test_img['orig'].to(device)
+labels = test_img['labels'].to(device)
 y = test.model(img, orig)
+
 out2 = torchvision.utils.make_grid(img)
 imshow(out2)
 
 theta = test.model.model[0].get_all_theta()
 for i in range(8):
+
     grid = F.affine_grid(theta[:, i], size=(img.shape[0], 3, 64, 64), align_corners=True).to(device)
     sample = F.grid_sample(input=orig, grid=grid, align_corners=True)
     print("theta%d" % i, theta[:, i])
